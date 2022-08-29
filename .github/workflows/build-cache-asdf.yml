@@ -1,0 +1,41 @@
+on:
+  workflow_call:
+    inputs:
+      working-directory:
+        type: string
+        required: false
+        description: The path containing the .tool-versions file
+        default: '.'
+      cache-version:
+        type: string
+        required: false
+        description: Additional tag used to refresh the cache
+        default: 'v1'
+
+jobs:
+  build-asdf:
+    name: Build ASDF
+    runs-on: ubuntu-latest
+    outputs:
+      cache-key: ${{ steps.cache-key.outputs.cache-key }}
+    steps:
+      - uses: actions/checkout@v2
+      - name: Tool versions path
+        id: tool-versions
+        run: |
+          tool_versions_path=$(realpath "${{ inputs.working-directory }}/.tool-versions")
+          echo "::set-output name=path::$tool_versions_path"
+      - name: Generate cache key
+        id: cache-key
+        run: |
+          echo "::set-output name=cache-key::${{ runner.os }}-asdf-${{ inputs.cache-version }}-${{ hashFiles(steps.tool-versions.outputs.path) }}"
+      - name: ASDF cache
+        id: asdf-cache
+        uses: actions/cache@v2
+        with:
+          path: ~/.asdf
+          key: steps.cache-key.outputs.cache-key
+    # only run `asdf install` if we didn't hit the cache
+      - name: ASDF install
+        uses: asdf-vm/actions/install@v1
+        if: steps.asdf-cache.outputs.cache-hit != 'true'
